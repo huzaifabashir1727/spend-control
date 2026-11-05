@@ -125,6 +125,76 @@ export const DataProvider = ({ children }) => {
     [currentUser, balance, history]
   );
 
+  const updateSpending = useCallback(
+    async (index, amount, detail, status) => {
+      if (!currentUser) return;
+
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const currentEntry = history[index];
+        if (!currentEntry) return;
+
+        const numericAmount = Number(amount);
+        const signedOldAmount =
+          currentEntry.status === 'Add'
+            ? Number(currentEntry.amount)
+            : -Math.abs(Number(currentEntry.amount));
+        const signedNewAmount =
+          status === 'Add' ? numericAmount : -numericAmount;
+        const updatedHistory = history.map((entry, entryIndex) =>
+          entryIndex === index
+            ? {
+                ...entry,
+                amount: signedNewAmount,
+                detail,
+                status,
+              }
+            : entry
+        );
+
+        await updateDoc(userDocRef, {
+          balance: balance - signedOldAmount + signedNewAmount,
+          history: updatedHistory,
+          updatedAt: new Date(),
+        });
+      } catch (error) {
+        console.error('Error updating spending:', error);
+        throw error;
+      }
+    },
+    [currentUser, balance, history]
+  );
+
+  const deleteSpending = useCallback(
+    async (index) => {
+      if (!currentUser) return;
+
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const entryToDelete = history[index];
+        if (!entryToDelete) return;
+
+        const signedAmount =
+          entryToDelete.status === 'Add'
+            ? Number(entryToDelete.amount)
+            : -Math.abs(Number(entryToDelete.amount));
+        const updatedHistory = history.filter(
+          (_, entryIndex) => entryIndex !== index
+        );
+
+        await updateDoc(userDocRef, {
+          balance: balance - signedAmount,
+          history: updatedHistory,
+          updatedAt: new Date(),
+        });
+      } catch (error) {
+        console.error('Error deleting spending:', error);
+        throw error;
+      }
+    },
+    [currentUser, balance, history]
+  );
+
   // Set initial value
   const setUserInitialValue = useCallback(
     async (value) => {
@@ -177,6 +247,8 @@ export const DataProvider = ({ children }) => {
         loading,
         addSpending,
         deductSpending,
+        updateSpending,
+        deleteSpending,
         clearAllData,
       }}
     >
